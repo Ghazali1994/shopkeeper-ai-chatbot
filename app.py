@@ -1,28 +1,26 @@
-# app.py
 import streamlit as st
 from transformers import pipeline
+import pandas as pd
 
-# ---- Streamlit page setup ----
+# ---- Streamlit page config ----
 st.set_page_config(page_title="Shopkeeper AI Chatbot", page_icon="🛒")
 st.title("🛍️ Shopkeeper AI Chatbot")
-st.write("Chat with your AI shop assistant for free!")
+st.write("Talk to your AI shop assistant for free!")
 
-# ---- Load free open-source model ----
+# ---- Load product knowledge ----
+products = pd.read_csv("products.csv")
+product_info = "\n".join([f"{row['Name']}: {row['Description']} ({row['Price']})" for _, row in products.iterrows()])
+
+# ---- Load a small, free open-source model ----
 @st.cache_resource
 def load_model():
-    chatbot_pipeline = pipeline("text-generation", model="tiiuae/falcon-7b-instruct", device=-1)
+    # Small model for zero-cost deployment
+    chatbot_pipeline = pipeline("text-generation", model="NousResearch/Nous-Hermes-13b-mini", device=-1)
     return chatbot_pipeline
 
 chatbot = load_model()
 
-# ---- Product knowledge ----
-products = [
-    {"name": "Red T-Shirt", "desc": "Cotton, comfortable", "price": "$25"},
-    {"name": "Sneakers", "desc": "Lightweight and stylish", "price": "$80"},
-]
-product_info = "\n".join([f"{p['name']}: {p['desc']} ({p['price']})" for p in products])
-
-# ---- Chat history ----
+# ---- Initialize chat history ----
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -32,7 +30,7 @@ user_input = st.text_input("You:", "")
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    prompt = f"You are a helpful shopkeeper AI. Products available:\n{product_info}\nCustomer: {user_input}\nShopkeeper:"
+    prompt = f"You are a friendly shopkeeper AI assistant. Here are the available products:\n{product_info}\nCustomer: {user_input}\nShopkeeper:"
 
     with st.spinner("Thinking..."):
         response = chatbot(prompt, max_length=150, do_sample=True)[0]["generated_text"]
