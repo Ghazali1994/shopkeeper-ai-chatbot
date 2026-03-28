@@ -8,15 +8,29 @@ st.title("🛍️ Shopkeeper AI Chatbot")
 st.write("Talk to your AI shop assistant for free!")
 
 # ---- Load product knowledge ----
-products = pd.read_csv("products.csv")
-product_info = "\n".join([f"{row['Name']}: {row['Description']} ({row['Price']})" for _, row in products.iterrows()])
+@st.cache_data
+def load_products():
+    products = pd.read_csv("products.csv")
+    return products
 
-# ---- Load a small, free open-source model ----
+products = load_products()
+product_info = "\n".join(
+    [f"{row['Name']}: {row['Description']} ({row['Price']})" for _, row in products.iterrows()]
+)
+
+# ---- Load a small model safely ----
 @st.cache_resource
 def load_model():
-    # Small model for zero-cost deployment
-    chatbot_pipeline = pipeline("text-generation", model="NousResearch/Nous-Hermes-13b-mini", device=-1)
-    return chatbot_pipeline
+    try:
+        # Replace "gpt2" with "NousResearch/Nous-Hermes-13b-mini" if you have token & enough memory
+        model_name = "gpt2"
+        # If using a private model:
+        # model_name = "NousResearch/Nous-Hermes-13b-mini"
+        # return pipeline("text-generation", model=model_name, device=-1, use_auth_token="YOUR_HF_TOKEN")
+        return pipeline("text-generation", model=model_name, device=-1)
+    except Exception as e:
+        st.error(f"Failed to load model: {e}")
+        return None
 
 chatbot = load_model()
 
@@ -27,13 +41,21 @@ if "messages" not in st.session_state:
 # ---- User input ----
 user_input = st.text_input("You:", "")
 
-if user_input:
+if user_input and chatbot:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    prompt = f"You are a friendly shopkeeper AI assistant. Here are the available products:\n{product_info}\nCustomer: {user_input}\nShopkeeper:"
+    # Limit product info to first 1000 chars to prevent huge prompts
+    prompt = (
+        f"You are a friendly shopkeeper AI assistant. "
+        f"Here are the available products:\n{product_info[:1000]}\n"
+        f"Customer: {user_input}\nShopkeeper:"
+    )
 
     with st.spinner("Thinking..."):
-        response = chatbot(prompt, max_length=150, do_sample=True)[0]["generated_text"]
+        try:
+            response = chatbot(prompt, max_length=150, do_sample=True)[0]["generated_text"]
+        except Exception as e:
+            response = f"Error generating response: {e}"
 
     st.session_state.messages.append({"role": "assistant", "content": response})
 
